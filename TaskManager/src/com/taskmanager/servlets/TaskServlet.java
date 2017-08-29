@@ -38,10 +38,25 @@ public class TaskServlet extends HttpServlet {
 	 */
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
+		String id;
+
 		response.setContentType("application/json");
-		Gson gson = new Gson();
-		String json = gson.toJson(tasks);
-		response.getWriter().write(json);
+		id = getIDFromURI(request.getRequestURI());
+
+		if (id == null) {
+			Gson gson = new Gson();
+			String json = gson.toJson(tasks);
+			response.getWriter().write(json);
+		} else {
+			Task task = getTask(id);
+			if (task != null) {
+				Gson gson = new Gson();
+				String json = gson.toJson(task);
+				response.getWriter().write(json);				
+			} else {
+				response.sendError(404, "Task not found");
+			}
+		}
 	}
 
 	/**
@@ -62,69 +77,82 @@ public class TaskServlet extends HttpServlet {
 	@Override
 	protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		String id;
-		boolean idHasFound = false;
-		id = getIDFromURI(req.getRequestURI());
-		
+
 		resp.setContentType("application/json");
-		
-		
-		
+		id = getIDFromURI(req.getRequestURI());
+
 		if (id != null) {
 			Gson gson = new Gson();
 			Task task = gson.fromJson(req.getReader(), Task.class);
 			task.setId(id);
-			for (Task t: tasks) {
-				if (t.getId().equals(id)) {
-					//Oba achou!!!
-					t.setTitle(task.getTitle());
-					t.setResume(task.getResume());
-					t.setIsCompleted(task.getIsCompleted());
-					resp.setStatus(HttpServletResponse.SC_OK);					
-
-					idHasFound = true;
-					break;
-
-				}
+			if (updateTask(task)) {
+				resp.setStatus(HttpServletResponse.SC_OK);
+				String json = gson.toJson(tasks);
+				resp.getWriter().write(json);
+			} else {
+				resp.sendError(404, "Task not found");
 			}
-		}
-		
-		if (!idHasFound) {
-			resp.sendError(404, "Task not found");
 		} else {
-			Gson gson = new Gson();
-			String json = gson.toJson(tasks);
-			resp.getWriter().write(json);			
+			resp.sendError(404, "Task not found");
 		}
 	}
 
 	@Override
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		String id;
-		boolean idHasFound = false;
-		id = getIDFromURI(req.getRequestURI());
-		
+
 		resp.setContentType("application/json");
-		
+		id = getIDFromURI(req.getRequestURI());
+
+		if (id != null) {
+			if (deleteTask(id)) {
+				resp.setStatus(HttpServletResponse.SC_OK);
+
+				Gson gson = new Gson();
+				String json = gson.toJson(tasks);
+				resp.getWriter().write(json);
+			} else {
+				resp.sendError(404, "Task not found");
+			}
+		} else {
+			resp.sendError(404, "Task not found");
+		}
+	}
+	
+	private Task getTask(String id) {
 		if (id != null) {
 			for (Task task: tasks) {
 				if (task.getId().equals(id)) {
-					//Oba achou!!!
-					tasks.remove(task);
-					resp.setStatus(HttpServletResponse.SC_OK);					
-
-					idHasFound = true;
-					break;
+					return task;
 				}
 			}
 		}
-		
-		if (!idHasFound) {
-			resp.sendError(404, "Task not found");
-		} else {
-			Gson gson = new Gson();
-			String json = gson.toJson(tasks);
-			resp.getWriter().write(json);			
+		return null;
+	}
+
+	private boolean updateTask(Task task) {
+		Task oldTask;
+
+		if (task != null) {
+			oldTask = getTask(task.getId());
+			if (oldTask != null) {
+				oldTask.setTitle(task.getTitle());
+				oldTask.setResume(task.getResume());
+				oldTask.setIsCompleted(task.getIsCompleted());
+				return true;
+			}
 		}
+		return false;
+	}
+
+	private boolean deleteTask(String id) {
+		for (Task task : tasks) {
+			if (task.getId().equals(id)) {
+				tasks.remove(task);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private String getIDFromURI(String uri) {
